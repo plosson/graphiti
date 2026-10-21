@@ -16,8 +16,12 @@ is untouched and the image still installs `graphiti-core` from PyPI.
    - `EMBEDDER_BASE_URL` (falls back to `OPENAI_BASE_URL`): `OpenAIEmbedder` with
      `EMBEDDING_MODEL_NAME`. Set `EMBEDDING_DIM` to the model's size (1536 for
      `text-embedding-3-small`; graphiti-core defaults to 1024 and truncates).
+   - `LLM_STRUCTURED_OUTPUT_MODE`: `json_schema` (default) or `json_object`. Use `json_object`
+     on OpenRouter: its OpenAI route enforces strict schemas, which graphiti's models don't meet.
    - `OPENAI_API_KEY` is the provider key. With no base URL set, behaviour is unchanged (OpenAI).
-3. **Dockerfile** — `INSTALL_FALKORDB` defaults to `true`, so the image includes the FalkorDB driver.
+3. **Ingest worker** — a failing `/messages` background job is logged and the queue keeps going
+   (upstream, one exception silently killed the worker and all later episodes stayed queued).
+4. **Dockerfile** — `INSTALL_FALKORDB` defaults to `true`, so the image includes the FalkorDB driver.
 
 ## Build
     docker build --build-arg GRAPHITI_VERSION=0.31.2 -t graphiti-server .
@@ -25,4 +29,4 @@ is untouched and the image still installs `graphiti-core` from PyPI.
 ## OpenRouter example
     OPENAI_API_KEY=sk-or-...  OPENAI_BASE_URL=https://openrouter.ai/api/v1
     MODEL_NAME=openai/gpt-4.1-mini  EMBEDDING_MODEL_NAME=openai/text-embedding-3-small
-    RERANKER_MODEL_NAME=openai/gpt-4o-mini  EMBEDDING_DIM=1536
+    RERANKER_MODEL_NAME=openai/gpt-4o-mini  EMBEDDING_DIM=1536  LLM_STRUCTURED_OUTPUT_MODE=json_object
