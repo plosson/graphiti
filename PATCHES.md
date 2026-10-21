@@ -28,6 +28,22 @@ is untouched and the image still installs `graphiti-core` from PyPI.
    `FALKORDB_DATABASE` graph, filtered by the `group_id` property. Upstream puts each group in
    its own graph, which the server's by-uuid endpoints (`GET/DELETE /entity-edge`,
    `DELETE /episode`, `DELETE /group`) never look at.
+7. **Bounded provider calls** — with an OpenAI-compatible base URL, the LLM, reranker and embedder
+   share bounded `AsyncOpenAI` clients: `LLM_TIMEOUT` (default 60 s per HTTP request, connect 10 s)
+   and `LLM_MAX_RETRIES` (default 1). `LLM_MAX_TOKENS` (default 8192) caps completion tokens
+   (OpenAIGenericClient defaults to 16384). The SDK default (600 s × 3 attempts) let one stalled
+   request hold the ingest worker for up to ~30 min.
+8. **Ingest worker hardening** (`server/graph_service/routers/ingest.py`)
+   - Jobs run on a long-lived Graphiti client owned by the worker; upstream reused the
+     request-scoped client, which is closed as soon as the 202 response is sent.
+   - Each job is wrapped in `asyncio.wait_for(..., INGEST_JOB_TIMEOUT)` (default 180 s); a
+     timeout or any exception is logged and the worker moves on to the next job.
+   - On failure/timeout the placeholder episode created for a client uuid is removed
+     (`remove_episode`), so the client sees it as missing and can re-send it.
+   - `INGEST_CONCURRENCY` (default 1, max 8) worker tasks.
+   - One log line per job: `ingest queued|start|done|failed|timeout job=N group=… uuid=… name=… chars=…`
+     with wait time, duration and queue size; `LOG_LEVEL` (default INFO) via `logging.basicConfig`.
+   - `GET /ingest/status` → `{queued, in_progress, workers, job_timeout_s, done, failed, timeout}`.
 6. **Dockerfile** — `INSTALL_FALKORDB` defaults to `true`, so the image includes the FalkorDB driver.
 
 ## Build
