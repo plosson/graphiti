@@ -99,7 +99,8 @@ def _create_ai_clients(settings: ZepEnvDep) -> dict:
                 base_url=llm_base_url,
                 model=model,
                 small_model=settings.small_model_name or model,
-            )
+            ),
+            structured_output_mode=settings.llm_structured_output_mode,  # type: ignore[arg-type]
         )
         # The reranker needs logprobs + logit_bias, so pick a model that supports them.
         clients['cross_encoder'] = OpenAIRerankerClient(

@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     embedder_base_url: str | None = Field(None)
     small_model_name: str | None = Field(None)
     reranker_model_name: str | None = Field(None)
+    # 'json_schema' (default) or 'json_object' (schema in the prompt). OpenRouter's OpenAI
+    # route enforces strict schemas, which graphiti's models don't meet: use 'json_object'.
+    llm_structured_output_mode: str = Field('json_schema')
     neo4j_uri: str | None = Field(None)
     neo4j_user: str | None = Field(None)
     neo4j_password: str | None = Field(None)
