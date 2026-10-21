@@ -65,7 +65,7 @@ COPY ./server/graph_service ./graph_service
 # build must defeat both caches or a newly flagged package would ship unscanned:
 # SOCKET_SCAN_ID (unique per release run) invalidates this layer, and
 # UV_NO_CACHE stops uv serving wheels from the cache mount below.
-ARG INSTALL_FALKORDB=false
+ARG INSTALL_FALKORDB=true
 ARG SOCKET_FIREWALL_ENABLED=false
 ARG SOCKET_SCAN_ID=
 RUN --mount=type=cache,target=/root/.cache/uv \
