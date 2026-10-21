@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     falkordb_database: str | None = Field(None)
     falkordb_username: str | None = Field(None)
     falkordb_password: str | None = Field(None)
+    # One FalkorDB graph for all group_ids (see zep_graphiti.py). Set false for upstream's graph-per-group.
+    falkordb_single_graph: bool = Field(True)
     db_backend: str = Field('neo4j')
 
     model_config = SettingsConfigDict(env_file='.env', extra='ignore')

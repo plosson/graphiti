@@ -163,7 +163,20 @@ def _create_graphiti_client(settings: ZepEnvDep) -> ZepGraphiti:
     if settings.db_backend == 'falkordb':
         from graphiti_core.driver.falkordb_driver import FalkorDriver
 
-        driver = FalkorDriver(  # type: ignore
+        driver_cls = FalkorDriver
+        if settings.falkordb_single_graph:
+
+            class SingleGraphFalkorDriver(FalkorDriver):
+                # graphiti_core puts every group_id in its own FalkorDB graph, but the server's
+                # by-uuid endpoints (GET/DELETE /entity-edge, DELETE /episode, DELETE /group)
+                # only look in the default graph. Keep all groups in FALKORDB_DATABASE and rely
+                # on the group_id property instead, as with Neo4j.
+                def clone(self, database: str):  # type: ignore[override]
+                    return self
+
+            driver_cls = SingleGraphFalkorDriver
+
+        driver = driver_cls(  # type: ignore
             host=settings.falkordb_host or 'localhost',  # type: ignore
             port=settings.falkordb_port or 6379,  # type: ignore
             database=settings.falkordb_database or 'default_db',  # type: ignore
