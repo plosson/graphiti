@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     openai_base_url: str | None = Field(None)
     model_name: str | None = Field(None)
     embedding_model_name: str | None = Field(None)
+    # OpenAI-compatible providers (e.g. OpenRouter). When an LLM base URL is set
+    # (LLM_BASE_URL, falling back to OPENAI_BASE_URL) the LLM uses OpenAIGenericClient
+    # (chat.completions + json_schema) and the reranker uses the same endpoint.
+    # The embedder uses EMBEDDER_BASE_URL, falling back to OPENAI_BASE_URL.
+    llm_base_url: str | None = Field(None)
+    embedder_base_url: str | None = Field(None)
+    small_model_name: str | None = Field(None)
+    reranker_model_name: str | None = Field(None)
     neo4j_uri: str | None = Field(None)
     neo4j_user: str | None = Field(None)
     neo4j_password: str | None = Field(None)

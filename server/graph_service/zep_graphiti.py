@@ -78,6 +78,52 @@ class ZepGraphiti(Graphiti):
             raise HTTPException(status_code=404, detail=e.message) from e
 
 
+def _create_ai_clients(settings: ZepEnvDep) -> dict:
+    """Build LLM, embedder and reranker clients for an OpenAI-compatible provider.
+
+    Returns an empty dict (graphiti defaults, i.e. OpenAI) when no base URL is configured.
+    """
+    llm_base_url = settings.llm_base_url or settings.openai_base_url
+    embedder_base_url = settings.embedder_base_url or settings.openai_base_url
+    clients: dict = {}
+
+    if llm_base_url:
+        from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
+        from graphiti_core.llm_client.config import LLMConfig
+        from graphiti_core.llm_client.openai_generic_client import OpenAIGenericClient
+
+        model = settings.model_name or 'gpt-4.1-mini'
+        clients['llm_client'] = OpenAIGenericClient(
+            config=LLMConfig(
+                api_key=settings.openai_api_key,
+                base_url=llm_base_url,
+                model=model,
+                small_model=settings.small_model_name or model,
+            )
+        )
+        # The reranker needs logprobs + logit_bias, so pick a model that supports them.
+        clients['cross_encoder'] = OpenAIRerankerClient(
+            config=LLMConfig(
+                api_key=settings.openai_api_key,
+                base_url=llm_base_url,
+                model=settings.reranker_model_name or 'gpt-4o-mini',
+            )
+        )
+
+    if embedder_base_url:
+        from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
+
+        clients['embedder'] = OpenAIEmbedder(
+            config=OpenAIEmbedderConfig(
+                api_key=settings.openai_api_key,
+                base_url=embedder_base_url,
+                embedding_model=settings.embedding_model_name or 'text-embedding-3-small',
+            )
+        )
+
+    return clients
+
+
 def _create_graphiti_client(settings: ZepEnvDep) -> ZepGraphiti:
     """Create a ZepGraphiti client based on the configured database backend."""
     if settings.db_backend == 'falkordb':
@@ -90,7 +136,7 @@ def _create_graphiti_client(settings: ZepEnvDep) -> ZepGraphiti:
             username=settings.falkordb_username or None,
             password=settings.falkordb_password or None,
         )
-        return ZepGraphiti(graph_driver=driver)  # type: ignore
+        return ZepGraphiti(graph_driver=driver, **_create_ai_clients(settings))  # type: ignore
     else:
         # Validate Neo4j settings are present
         if not all([settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password]):
@@ -102,6 +148,7 @@ def _create_graphiti_client(settings: ZepEnvDep) -> ZepGraphiti:
             uri=settings.neo4j_uri,
             user=settings.neo4j_user,
             password=settings.neo4j_password,
+            **_create_ai_clients(settings),
         )
 
 
