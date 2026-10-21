@@ -46,15 +46,17 @@ class ZepGraphiti(Graphiti):
         content: str,
         reference_time: datetime,
         source_description: str,
-    ):
+    ) -> bool:
         """Create the episode with a client-chosen uuid if it does not exist yet.
+
+        Returns True when the episode was created here, False when it already existed.
 
         graphiti_core's add_episode(uuid=...) only re-processes an existing episode, so a new
         message that carries its own uuid would fail with NodeNotFoundError.
         """
         try:
             await EpisodicNode.get_by_uuid(self.driver, uuid)
-            return
+            return False
         except NodeNotFoundError:
             pass
         await EpisodicNode(
@@ -68,6 +70,7 @@ class ZepGraphiti(Graphiti):
             created_at=utc_now(),
             valid_at=reference_time,
         ).save(self.driver)
+        return True
 
     async def get_entity_edge(self, uuid: str):
         try:
@@ -120,6 +123,19 @@ def _create_ai_clients(settings: ZepEnvDep) -> dict:
     embedder_base_url = settings.embedder_base_url or settings.openai_base_url
     clients: dict = {}
 
+    def _openai(base_url: str):
+        # Bounded timeouts: the SDK default (600 s read, 2 retries) let one stalled provider
+        # request hold the single ingest worker for up to ~30 minutes.
+        import httpx
+        from openai import AsyncOpenAI
+
+        return AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            base_url=base_url,
+            timeout=httpx.Timeout(settings.llm_timeout, connect=10.0),
+            max_retries=settings.llm_max_retries,
+        )
+
     if llm_base_url:
         from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
         from graphiti_core.llm_client.config import LLMConfig
@@ -133,6 +149,8 @@ def _create_ai_clients(settings: ZepEnvDep) -> dict:
                 model=model,
                 small_model=settings.small_model_name or model,
             ),
+            client=_openai(llm_base_url),
+            max_tokens=settings.llm_max_tokens,
             structured_output_mode=settings.llm_structured_output_mode,  # type: ignore[arg-type]
         )
         # The reranker needs logprobs + logit_bias, so pick a model that supports them.
@@ -141,7 +159,8 @@ def _create_ai_clients(settings: ZepEnvDep) -> dict:
                 api_key=settings.openai_api_key,
                 base_url=llm_base_url,
                 model=settings.reranker_model_name or 'gpt-4o-mini',
-            )
+            ),
+            client=_openai(llm_base_url),
         )
 
     if embedder_base_url:
@@ -152,7 +171,8 @@ def _create_ai_clients(settings: ZepEnvDep) -> dict:
                 api_key=settings.openai_api_key,
                 base_url=embedder_base_url,
                 embedding_model=settings.embedding_model_name or 'text-embedding-3-small',
-            )
+            ),
+            client=_openai(embedder_base_url),
         )
 
     return clients
@@ -199,7 +219,7 @@ def _create_graphiti_client(settings: ZepEnvDep) -> ZepGraphiti:
         )
 
 
-async def get_graphiti(settings: ZepEnvDep):
+def create_graphiti(settings) -> ZepGraphiti:
     client = _create_graphiti_client(settings)
     if settings.openai_base_url is not None:
         client.llm_client.config.base_url = settings.openai_base_url
@@ -207,7 +227,11 @@ async def get_graphiti(settings: ZepEnvDep):
         client.llm_client.config.api_key = settings.openai_api_key
     if settings.model_name is not None:
         client.llm_client.model = settings.model_name
+    return client
 
+
+async def get_graphiti(settings: ZepEnvDep):
+    client = create_graphiti(settings)
     try:
         yield client
     finally:

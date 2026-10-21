@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     # One FalkorDB graph for all group_ids (see zep_graphiti.py). Set false for upstream's graph-per-group.
     falkordb_single_graph: bool = Field(True)
     db_backend: str = Field('neo4j')
+    # Background ingest (/messages). A job that exceeds INGEST_JOB_TIMEOUT seconds is cancelled,
+    # logged and dropped so it cannot block the queue; INGEST_CONCURRENCY workers run in parallel.
+    ingest_job_timeout: float = Field(180.0)
+    ingest_concurrency: int = Field(1, ge=1, le=8)
+    # Per-HTTP-request timeout (seconds) and SDK retries for the LLM, embedder and reranker clients
+    # when an OpenAI-compatible base URL is set. The OpenAI SDK default is 600 s x 3 attempts.
+    llm_timeout: float = Field(60.0)
+    llm_max_retries: int = Field(1, ge=0)
+    # Upper bound on completion tokens per LLM call (OpenAIGenericClient defaults to 16384).
+    llm_max_tokens: int = Field(8192)
 
     model_config = SettingsConfigDict(env_file='.env', extra='ignore')
 
