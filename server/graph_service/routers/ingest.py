@@ -60,11 +60,16 @@ async def add_messages(
     graphiti: ZepGraphitiDep,
 ):
     async def add_messages_task(m: Message):
+        episode_body = f'{m.role or ""}({m.role_type}): {m.content}'
+        if m.uuid is not None:
+            await graphiti.ensure_episode(
+                m.uuid, request.group_id, m.name, episode_body, m.timestamp, m.source_description
+            )
         await graphiti.add_episode(
             uuid=m.uuid,
             group_id=request.group_id,
             name=m.name,
-            episode_body=f'{m.role or ""}({m.role_type}): {m.content}',
+            episode_body=episode_body,
             reference_time=m.timestamp,
             source=EpisodeType.message,
             source_description=m.source_description,

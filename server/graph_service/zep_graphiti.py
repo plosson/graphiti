@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
@@ -6,7 +7,8 @@ from graphiti_core import Graphiti  # type: ignore
 from graphiti_core.edges import EntityEdge  # type: ignore
 from graphiti_core.errors import EdgeNotFoundError, GroupsEdgesNotFoundError, NodeNotFoundError
 from graphiti_core.llm_client import LLMClient  # type: ignore
-from graphiti_core.nodes import EntityNode, EpisodicNode  # type: ignore
+from graphiti_core.nodes import EntityNode, EpisodeType, EpisodicNode  # type: ignore
+from graphiti_core.utils.datetime_utils import utc_now  # type: ignore
 
 from graph_service.config import ZepEnvDep
 from graph_service.dto import FactResult
@@ -35,6 +37,37 @@ class ZepGraphiti(Graphiti):
         await new_node.generate_name_embedding(self.embedder)
         await new_node.save(self.driver)
         return new_node
+
+    async def ensure_episode(
+        self,
+        uuid: str,
+        group_id: str,
+        name: str,
+        content: str,
+        reference_time: datetime,
+        source_description: str,
+    ):
+        """Create the episode with a client-chosen uuid if it does not exist yet.
+
+        graphiti_core's add_episode(uuid=...) only re-processes an existing episode, so a new
+        message that carries its own uuid would fail with NodeNotFoundError.
+        """
+        try:
+            await EpisodicNode.get_by_uuid(self.driver, uuid)
+            return
+        except NodeNotFoundError:
+            pass
+        await EpisodicNode(
+            uuid=uuid,
+            name=name,
+            group_id=group_id,
+            labels=[],
+            source=EpisodeType.message,
+            content=content,
+            source_description=source_description,
+            created_at=utc_now(),
+            valid_at=reference_time,
+        ).save(self.driver)
 
     async def get_entity_edge(self, uuid: str):
         try:
