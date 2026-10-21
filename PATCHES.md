@@ -21,7 +21,14 @@ is untouched and the image still installs `graphiti-core` from PyPI.
    - `OPENAI_API_KEY` is the provider key. With no base URL set, behaviour is unchanged (OpenAI).
 3. **Ingest worker** — a failing `/messages` background job is logged and the queue keeps going
    (upstream, one exception silently killed the worker and all later episodes stayed queued).
-4. **Dockerfile** — `INSTALL_FALKORDB` defaults to `true`, so the image includes the FalkorDB driver.
+4. **Client-chosen episode uuid** — `/messages` items with a `uuid` create a new episode with
+   that uuid (graphiti_core's `add_episode(uuid=...)` only re-processes existing episodes and
+   failed with `NodeNotFoundError`).
+5. **One FalkorDB graph** — by default (`FALKORDB_SINGLE_GRAPH=true`) every group_id lives in the
+   `FALKORDB_DATABASE` graph, filtered by the `group_id` property. Upstream puts each group in
+   its own graph, which the server's by-uuid endpoints (`GET/DELETE /entity-edge`,
+   `DELETE /episode`, `DELETE /group`) never look at.
+6. **Dockerfile** — `INSTALL_FALKORDB` defaults to `true`, so the image includes the FalkorDB driver.
 
 ## Build
     docker build --build-arg GRAPHITI_VERSION=0.31.2 -t graphiti-server .
