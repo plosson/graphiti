@@ -1,3 +1,5 @@
+import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,6 +8,14 @@ from fastapi.responses import JSONResponse
 from graph_service.config import get_settings
 from graph_service.routers import ingest, retrieve
 from graph_service.zep_graphiti import initialize_graphiti
+
+# Make graph_service INFO logs (one line per ingest job) visible next to uvicorn's access log.
+logging.basicConfig(
+    level=os.environ.get('LOG_LEVEL', 'INFO').upper(),
+    format='%(asctime)s %(levelname)s %(name)s: %(message)s',
+)
+for noisy in ('httpx', 'httpcore', 'openai', 'graphiti_core'):
+    logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 @asynccontextmanager
